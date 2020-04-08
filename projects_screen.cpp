@@ -1,8 +1,9 @@
 #include "project_info_screen.h"
 #include "main_window.h"
 
-ProjectsScreen::ProjectsScreen(MainWindow* main_window)
+ProjectsScreen::ProjectsScreen(MainWindow* main_window, NetworkProtocol* network_protocol)
     : QWidget(main_window)
+    , network_protocol(network_protocol)
     , isProjectProcessing(false)
     , main_window(main_window)
     , projects_list(new QListWidget())
@@ -13,15 +14,14 @@ ProjectsScreen::ProjectsScreen(MainWindow* main_window)
     projects_layout->setAlignment(Qt::AlignHCenter);
     projects_list->setFixedWidth(600);
 
-    connect(projects_list, &QListWidget::itemClicked, this, &ProjectsScreen::onProjectsListItemClicked);
+    QObject::connect(projects_list, &QListWidget::itemClicked, this, &ProjectsScreen::onProjectsListItemClicked);
 }
 
-void ProjectsScreen::ShowMe(QJsonObject &projects_info)
+void ProjectsScreen::ShowMe(QJsonArray &projects_info)
 {
     projects_list->clear();
 
-    QJsonArray projects = projects_info["projects"].toArray();
-    for(auto i = projects.begin(); i != projects.end(); ++i)
+    for(auto i = projects_info.begin(); i != projects_info.end(); ++i)
     {
         addProjectToList(i->toObject());
     }
@@ -84,7 +84,7 @@ void ProjectsScreen::addProjectToList(QJsonObject project_info)
     project_layout->addWidget(time_month_value, 1, 4, 1, 1);
     project_layout->addWidget(time_total_value, 2, 4, 1, 1);
 
-    main_window->LoadIcon(icon, project_info["logo_url"].toString(), {100, 100});
+    network_protocol->LoadIcon(icon, project_info["logo_url"].toString(), {100, 100});
 
     projects_list->addItem(project_item);
     projects_list->setItemWidget(project_item, project_widget);
@@ -93,46 +93,10 @@ void ProjectsScreen::addProjectToList(QJsonObject project_info)
 
 void ProjectsScreen::onProjectsListItemClicked(QListWidgetItem *item)
 {
-    if(isProjectProcessing)
-        return;
-
-    isProjectProcessing = true;
-
-    QNetworkRequest request;
-
-    request.setUrl(QUrl("https://api.quwi.com/v2/projects-manage/index"));
-    request.setRawHeader("Authorization", ("Bearer " + main_window->auth_token).toUtf8());
-
-    QNetworkReply *reply = main_window->manager->get(request);
-
     int id = item->data(Qt::UserRole + 1).toInt();
-    connect(reply, &QNetworkReply::readyRead, [reply, this, id]()
-    {
-        if (reply->error())
-        {
-            qDebug()<<reply->errorString();
+    QString id_str = QString::number(id);
+    main_window->setProperty("current_project_id", QVariant(id_str));
 
-            isProjectProcessing = false;
-            return;
-        }
-
-        QString answer = reply->readAll();
-        QJsonDocument doc = QJsonDocument::fromJson(answer.toUtf8());
-        QJsonObject projects_info = doc.object();
-
-        QJsonArray projects = projects_info["projects"].toArray();
-        for(auto i = projects.begin(); i != projects.end(); ++i)
-        {
-            if(i->toObject()["id"].toInt() == id)
-            {
-                main_window->setProperty("current_project_id", id);
-                main_window->ShowProjectInfoScreen(i->toObject());
-                break;
-            }
-        }
-
-
-        isProjectProcessing = false;
-    });
+    main_window->PrepareProjectInfoScreen(id_str);
 }
 

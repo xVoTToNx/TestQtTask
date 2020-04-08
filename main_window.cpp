@@ -3,25 +3,27 @@
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
-    , auth_token("")
+    , network_protocol(new NetworkProtocol(this))
     , main_screen(new QWidget(this))
     , screens(new QStackedWidget(this))
-    , login_screen(this)
-    , projects_screen(this)
-    , project_info_screen(this)
+    , login_screen(new LoginScreen(this, network_protocol))
+    , projects_screen(new ProjectsScreen(this, network_protocol))
+    , project_info_screen(new ProjectInfoScreen(this, network_protocol))
     , toolbar(new QToolBar("Title", this))
     , main_layout(new QVBoxLayout())
-
-    , manager(new QNetworkAccessManager(this))
     , ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
 
     initMainScreen();
 
-    screens->addWidget(&login_screen);
-    screens->addWidget(&projects_screen);
-    screens->addWidget(&project_info_screen);
+    screens->addWidget(login_screen);
+    screens->addWidget(projects_screen);
+    screens->addWidget(project_info_screen);
+
+    QObject::connect (network_protocol, &NetworkProtocol::LoggedIn, this, &MainWindow::PrepareProjectsScreen);
+    QObject::connect (network_protocol, &NetworkProtocol::ProjectsReceived, this, &MainWindow::ShowProjectsScreen);
+    QObject::connect (network_protocol, &NetworkProtocol::ProjectInfoReceived, this, &MainWindow::ShowProjectInfoScreen);
 
     ShowLoginScreen();
 }
@@ -47,43 +49,35 @@ void MainWindow::ShowLoginScreen()
 {
     setLoginToolBar();
 
-    screens->setCurrentWidget(&login_screen);
+    screens->setCurrentWidget(login_screen);
 }
 
-void MainWindow::ShowProjectsScreen()
+void MainWindow::PrepareProjectsScreen()
 {
+    qDebug()<<"Prepairing project screen";
+    network_protocol->GetProjects();
+}
+
+void MainWindow::ShowProjectsScreen(QJsonArray projects)
+{
+    qDebug()<<"Show porjects screen!";
     setProjectsToolBar();
 
-    QNetworkRequest request;
+    projects_screen->ShowMe(projects);
 
-    request.setUrl(QUrl("https://api.quwi.com/v2/projects-manage/index"));
-    request.setRawHeader("Authorization", ("Bearer " + auth_token).toUtf8());
+    screens->setCurrentWidget(projects_screen);
+}
 
-    QNetworkReply *reply = manager->get(request);
-    connect(reply, &QNetworkReply::readyRead, [reply, this]()
-    {
-        if (reply->error())
-        {
-            login_screen.ShowErrorMessage("Something went wrong");
-            ShowLoginScreen();
-            return;
-        }
-
-        QString answer = reply->readAll();
-        QJsonDocument doc = QJsonDocument::fromJson(answer.toUtf8());
-        QJsonObject proj_info = doc.object();
-
-        projects_screen.ShowMe(proj_info);
-
-        screens->setCurrentWidget(&projects_screen);
-    });
+void MainWindow::PrepareProjectInfoScreen(const QString& id_str)
+{
+    network_protocol->GetProjectInfo(id_str);
 }
 
 void MainWindow::ShowProjectInfoScreen(QJsonObject project_info)
 {
-    project_info_screen.ShowMe(project_info);
+    project_info_screen->ShowMe(project_info);
 
-    screens->setCurrentWidget(&project_info_screen);
+    screens->setCurrentWidget(project_info_screen);
 }
 
 void MainWindow::initToolBar()
@@ -93,62 +87,53 @@ void MainWindow::initToolBar()
     toolbar->setFloatable(false);
     toolbar->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Minimum);
     toolbar->setStyleSheet("QToolBar { background-color: white; border: 1px solid black; }");
+
+    QWidget *spacerWidget = new QWidget(this);
+    spacerWidget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+    spacerWidget->setVisible(true);
+    toolbar->addWidget(spacerWidget);
+
+    login_action = new QAction("LOGIN", toolbar);
+    login_action->setEnabled(false);
+    toolbar->addAction(login_action);
+
+    projects_action = new QAction("PROJECTS", toolbar);
+    projects_action->setEnabled(true);
+    toolbar->addAction(projects_action);
+
+    logout_action = new QAction("LOGOUT", toolbar);
+    logout_action->setEnabled(true);
+    toolbar->addAction(logout_action);
+
+    QObject::connect(projects_action, &QAction::triggered, this, &MainWindow::PrepareProjectsScreen);
+    QObject::connect(logout_action, &QAction::triggered, this, &MainWindow::ShowLoginScreen);
+
+    login_action->setVisible(false);
+    projects_action->setVisible(false);
+    logout_action->setVisible(false);
 }
 
 void MainWindow::setLoginToolBar()
 {
-    toolbar->clear();
-    QWidget *spacerWidget = new QWidget(this);
-    spacerWidget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
-    spacerWidget->setVisible(true);
-    toolbar->addWidget(spacerWidget);
-
-    QAction* login_action = new QAction("LOGIN", toolbar);
-    login_action->setEnabled(false);
-    toolbar->addAction(login_action);
+    login_action->setVisible(true);
 }
 
 void MainWindow::setProjectsToolBar()
 {
-    toolbar->clear();
-    QWidget *spacerWidget = new QWidget(this);
-    spacerWidget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
-    spacerWidget->setVisible(true);
-    toolbar->addWidget(spacerWidget);
-
-    QAction* projects_action = new QAction("PROJECTS", toolbar);
-    projects_action->setEnabled(true);
-    toolbar->addAction(projects_action);
-
-    QAction* logout_action = new QAction("LOGOUT", toolbar);
-    logout_action->setEnabled(true);
-    toolbar->addAction(logout_action);
-
-    connect(toolbar, &QToolBar::actionTriggered, [this, projects_action, logout_action](QAction* action){
-        if(action == projects_action)
-            ShowProjectsScreen();
-        else if (action == logout_action)
-            ShowLoginScreen();
-    });
+    projects_action->setVisible(true);
+    logout_action->setVisible(true);
 }
 
-void MainWindow::LoadIcon(QLabel *icon, QString url, QSize icon_size)
+void MainWindow::ChangeLoginScreen(bool isAuthorized)
 {
-    QNetworkRequest request;
-    request.setUrl(QUrl(url));
-
-
-    QNetworkReply *reply = manager->get(request);
-    connect(reply, &QNetworkReply::readyRead, [reply, icon, icon_size]()
+    if(isAuthorized)
     {
-        if (reply->error())
-        {return;}
-        QImageReader imageReader(reply);
-        imageReader.setAutoDetectImageFormat (true);
-        QImage pic = imageReader.read();
-        pic = pic.scaled(icon_size, Qt::KeepAspectRatio);
-        icon->setPixmap(QPixmap::fromImage(pic));
-    });
+        PrepareProjectsScreen();
+    }
+    else
+    {
+        ShowLoginScreen();
+    }
 }
 
 

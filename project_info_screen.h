@@ -6,14 +6,10 @@
 #include <QLabel>
 #include <QPushButton>
 #include <QVBoxLayout>
-#include <QNetworkRequest>
-#include <QUrlQuery>
-#include <QNetworkReply>
-#include <QNetworkAccessManager>
-#include <QJsonDocument>
-#include <QJsonObject>
-#include <QJsonArray>
+#include <QCheckBox>
 #include <QListWidget>
+
+#include "network_protocol.h"
 
 class MainWindow;
 
@@ -21,6 +17,7 @@ class ProjectInfoScreen : public QWidget
 {
     Q_OBJECT
 
+    NetworkProtocol* network_protocol;
     bool isProjectProcessing;
 
     MainWindow* main_window;
@@ -31,12 +28,12 @@ class ProjectInfoScreen : public QWidget
     QLabel* project_icon_label;
     QLineEdit* project_name_edit;
     QPushButton* project_name_button;
-    QToolButton* active_button;
-    QToolButton* add_me_as_watcher_button;
+    QCheckBox* active_button;
+    QCheckBox* add_me_as_watcher_button;
     QGridLayout* project_info_layout;
 
 public:
-    ProjectInfoScreen(MainWindow* main_window);
+    ProjectInfoScreen(MainWindow* main_window, NetworkProtocol* network_protocol);
     void ShowMe(QJsonObject& project_info);
 
 private slots:

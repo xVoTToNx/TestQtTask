@@ -1,8 +1,9 @@
 #include "login_screen.h"
 #include "main_window.h"
 
-LoginScreen::LoginScreen(MainWindow* main_window)
+LoginScreen::LoginScreen(MainWindow* main_window, NetworkProtocol* network_protocol)
     : QWidget(main_window)
+    , network_protocol(network_protocol)
     , main_window(main_window)
     , isLoginProcessing(false)
     , login_edit(new QLineEdit(""))
@@ -12,6 +13,10 @@ LoginScreen::LoginScreen(MainWindow* main_window)
     , login_button(new QPushButton("LOGIN"))
     , login_layout(new QVBoxLayout())
 {
+
+    QObject::connect(network_protocol, &NetworkProtocol::onLoginErrorReceived,
+                     this, &LoginScreen::onLoginError);
+
     QFont font("Arial", 9, 9);
     login_edit->setFont(font);
     password_edit->setFont(font);
@@ -48,62 +53,20 @@ LoginScreen::LoginScreen(MainWindow* main_window)
     login_layout->setAlignment(Qt::AlignCenter);
     login_error_label->setAlignment(Qt::AlignLeft);
 
-    connect(login_button, &QPushButton::clicked,
+    QObject::connect(login_button, &QPushButton::clicked,
             this, &LoginScreen::onLoginButtonClick);
 
     setLayout(login_layout);
 }
 
-void LoginScreen::ShowErrorMessage(QString error_msg)
-{
-    login_error_label->setText(error_msg);
-}
-
 void LoginScreen::onLoginButtonClick()
 {
-    if(isLoginProcessing)
-        return;
+    QString email = login_edit->text();
+    QString password = password_edit->text();
+    network_protocol->Login(email, password);
+}
 
-    isLoginProcessing = true;
-
-    QNetworkRequest request;
-
-    request.setUrl(QUrl("https://api.quwi.com/v2/auth/login"));
-    QUrlQuery params;
-    params.addQueryItem("email", login_edit->text().toUtf8());
-    params.addQueryItem("password", password_edit->text().toUtf8());
-
-    QNetworkReply *reply = main_window->manager->post(request, params.query().toUtf8());
-
-    connect(reply, &QNetworkReply::readyRead, [reply, this]()
-    {
-        if (reply->error())
-        {
-            login_error_label->setText("Error: " + reply->errorString());
-
-            isLoginProcessing = false;
-            return;
-        }
-
-        QString answer = reply->readAll();
-        QJsonDocument doc = QJsonDocument::fromJson(answer.toUtf8());
-        QJsonObject obj = doc.object();
-
-        if(obj.contains("first_errors"))
-        {
-            login_error_label->setText(obj["first_errors"].toObject().begin()->toString());
-
-            isLoginProcessing = false;
-            return;
-        }
-
-        login_error_label->setText("");
-        login_edit->setText("");
-        password_edit->setText("");
-
-        main_window->auth_token = obj["token"].toString();
-        main_window->ShowProjectsScreen();
-
-        isLoginProcessing = false;
-    });
+void LoginScreen::onLoginError(QString error_str)
+{
+    login_error_label->setText(error_str);
 }

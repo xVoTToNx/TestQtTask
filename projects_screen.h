@@ -7,14 +7,9 @@
 #include <QLabel>
 #include <QPushButton>
 #include <QVBoxLayout>
-#include <QNetworkRequest>
-#include <QUrlQuery>
-#include <QNetworkReply>
-#include <QNetworkAccessManager>
-#include <QJsonDocument>
-#include <QJsonObject>
-#include <QJsonArray>
 #include <QListWidget>
+
+#include "network_protocol.h"
 
 class MainWindow;
 
@@ -24,14 +19,15 @@ class ProjectsScreen : public QWidget
 
     bool isProjectProcessing;
 
+    NetworkProtocol* network_protocol;
     MainWindow* main_window;
 
     QListWidget* projects_list;
     QVBoxLayout* projects_layout;
 
 public:
-    ProjectsScreen(MainWindow* main_window);
-    void ShowMe(QJsonObject& projects_info);
+    ProjectsScreen(MainWindow* main_window, NetworkProtocol* network_protocol);
+    void ShowMe(QJsonArray& projects_info);
 
 private:
     void addProjectToList(QJsonObject project_info);

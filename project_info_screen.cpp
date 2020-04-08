@@ -1,18 +1,19 @@
 #include "project_info_screen.h"
 #include "main_window.h"
 
-ProjectInfoScreen::ProjectInfoScreen(MainWindow* main_window)
+ProjectInfoScreen::ProjectInfoScreen(MainWindow* main_window, NetworkProtocol* network_protocol)
     : QWidget(main_window)
-    , isProjectProcessing(false)
+    , network_protocol(network_protocol)
     , main_window(main_window)
+    , isProjectProcessing(false)
     , active_label(new QLabel("Active"))
     , name_label(new QLabel("Name"))
     , add_me_as_watcher_label(new QLabel("Add me as watcher to tickets created by others"))
     , project_icon_label(new QLabel(""))
     , project_name_edit(new QLineEdit())
     , project_name_button(new QPushButton("OK"))
-    , active_button(new QToolButton())
-    , add_me_as_watcher_button(new QToolButton())
+    , active_button(new QCheckBox())
+    , add_me_as_watcher_button(new QCheckBox())
     , project_info_layout(new QGridLayout())
 {
     setLayout(project_info_layout);
@@ -48,13 +49,15 @@ ProjectInfoScreen::ProjectInfoScreen(MainWindow* main_window)
     active_button->setStyleSheet("QToolButton {background-color: grey };");
     add_me_as_watcher_button->setStyleSheet("QToolButton {background-color: grey };");
 
-    connect(active_button, &QToolButton::toggled, [this](bool checked) {
-        active_button->setStyleSheet("QToolButton {background-color: " + QString(checked ? "green" : "grey") + " };");
-    });
-    connect(add_me_as_watcher_button, &QToolButton::toggled, [this](bool checked) {
-        add_me_as_watcher_button->setStyleSheet("QToolButton {background-color: " + QString(checked ? "green" : "grey") + " };");
-    });
-    connect(project_name_button, &QPushButton::clicked, this, &ProjectInfoScreen::onProjectNameButtonClicked);
+        active_button->setStyleSheet("QCheckBox::indicator:checked {"
+                                     "image: url(:/icon/img/checkbox.png);}");
+        add_me_as_watcher_button->setStyleSheet("QCheckBox::indicator:unchecked {"
+                                                "color: grey;}"
+                                           "QCheckBox::indicator:checked {"
+                                                "color: green;}");
+
+
+    QObject::connect(project_name_button, &QPushButton::clicked, this, &ProjectInfoScreen::onProjectNameButtonClicked);
 
     project_name_edit->setStyleSheet("QLineEdit { border: 1px solid grey; border-radius: 5px;}");
     project_name_button->setStyleSheet("QPushButton { color: white; background-color: blue; border-radius: 5px;}");
@@ -69,20 +72,15 @@ void ProjectInfoScreen::ShowMe(QJsonObject &project_info)
 
     QPixmap pixmap;
     project_icon_label->setPixmap(pixmap);
-    main_window->LoadIcon(project_icon_label, project_info["logo_url"].toString(), {80, 80});
+    network_protocol->LoadIcon(project_icon_label, project_info["logo_url"].toString(), {80, 80});
 }
 
 void ProjectInfoScreen::onProjectNameButtonClicked()
 {
-    QNetworkRequest request;
-
-    request.setUrl(QUrl("https://api.quwi.com/v2/projects-manage/update?id=" + QString::number(main_window->property("current_project_id").toInt())));
-    request.setRawHeader("Authorization", ("Bearer " + main_window->auth_token).toUtf8());
-
-    QUrlQuery params;
-    params.addQueryItem("name", project_name_edit->text());
-
-    QNetworkReply *reply = main_window->manager->post(request, params.query().toUtf8());
+    QString id_str = main_window->property("current_project_id").toString();
+    QJsonObject project_info;
+    project_info.insert("name", QJsonValue(project_name_edit->text()));
+    network_protocol->EditProjectInfo(id_str, project_info);
 }
 
 

@@ -6,13 +6,8 @@
 #include <QLabel>
 #include <QPushButton>
 #include <QVBoxLayout>
-#include <QNetworkRequest>
-#include <QUrlQuery>
-#include <QNetworkReply>
-#include <QNetworkAccessManager>
-#include <QJsonDocument>
-#include <QJsonObject>
-#include <QJsonArray>
+
+#include "network_protocol.h"
 
 class MainWindow;
 
@@ -20,9 +15,8 @@ class LoginScreen : public QWidget
 {
     Q_OBJECT
 
+    NetworkProtocol* network_protocol;
     MainWindow* main_window;
-
-    bool isLoginProcessing;
 
     QLineEdit* login_edit;
     QLineEdit* password_edit;
@@ -31,12 +25,15 @@ class LoginScreen : public QWidget
     QPushButton* login_button;
     QVBoxLayout* login_layout;
 
+    bool isLoginProcessing;
+
+
 public:
-    LoginScreen(MainWindow* main_window);
-    void ShowErrorMessage(QString error_msg);
+    LoginScreen(MainWindow* main_window, NetworkProtocol* network_protocol);
 
 private slots:
     void onLoginButtonClick();
+    void onLoginError(QString error_str);
 };
 
 #endif // LOGINSCREEN_H

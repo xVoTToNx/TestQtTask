@@ -17,16 +17,30 @@ DEFINES += QT_DEPRECATED_WARNINGS
 #DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x060000    # disables all the APIs deprecated before Qt 6.0.0
 
 SOURCES += \
+    edit_project_info_http_request.cpp \
+    http_request.cpp \
+    load_icon_http_request.cpp \
+    login_http_request.cpp \
     login_screen.cpp \
     main.cpp \
     main_window.cpp \
+    network_protocol.cpp \
+    project_info_http_request.cpp \
     project_info_screen.cpp \
+    projects_http_request.cpp \
     projects_screen.cpp
 
 HEADERS += \
+    edit_project_info_http_request.h \
+    http_request.h \
+    load_icon_http_request.h \
+    login_http_request.h \
     login_screen.h \
     main_window.h \
+    network_protocol.h \
+    project_info_http_request.h \
     project_info_screen.h \
+    projects_http_request.h \
     projects_screen.h
 
 FORMS += \
@@ -37,3 +51,8 @@ INCLUDEPATH += C:\Program Files\OpenSSL-Win6\include
 qnx: target.path = /tmp/$${TARGET}/bin
 else: unix:!android: target.path = /opt/$${TARGET}/bin
 !isEmpty(target.path): INSTALLS += target
+
+DISTFILES +=
+
+RESOURCES += \
+    Res.qrc
